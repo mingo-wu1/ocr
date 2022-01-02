@@ -19,22 +19,23 @@ except ImportError:
     print('http://code.google.com/p/tesseract-ocr/')
     raise SystemExit
 
+ocr_area = 1500
 
 def preprocess(gray):
-    # 1. Sobel算子，x方向求梯度
+    # 1. Sobel算子，x方向求梯度 索贝尔算子主要用作边缘检测
     sobel = cv2.Sobel(gray, cv2.CV_8U, 1, 0, ksize=3)
-    # 2. 图像二值化
+    # 2. 图像二值化 彩色图像： 有blue，green，red三个通道，取值范围均为0-255; 灰度图：只有一个通道0-255，所以一共有256种颜色; 二值图像：只有两种颜色，黑色和白色
     ret, binary = cv2.threshold(sobel, 0, 255, cv2.THRESH_OTSU + cv2.THRESH_BINARY)
 
-    # 3. 核函数
+    # 3. 核函数 核函数的作用就是隐含着一个从低维空间到高维空间的映射，而这个映射可以把低维空间中线性不可分的两类点变成线性可分的。 
     element1 = cv2.getStructuringElement(cv2.MORPH_RECT, (30, 9))
     element2 = cv2.getStructuringElement(cv2.MORPH_RECT, (24, 6))
 
-
-    # 4. 膨胀一次，让轮廓突出
+    # https://www.cnblogs.com/angle6-liu/p/10704970.html
+    # 4. 膨胀一次，让轮廓突出 该公式表示用B来对图像A进行膨胀处理，其中B是一个卷积模板或卷积核，其形状可以为正方形或圆形，通过模板B与图像A进行卷积计算，扫描图像中的每一个像素点，用模板元素与二值图像元素做“与”运算，如果都为0，那么目标像素点为0，否则为1。从而计算B覆盖区域的像素点最大值，并用该值替换参考点的像素值实现膨胀。下图是将左边的原始图像A膨胀处理为右边的效果图A⊕B。
     dilation = cv2.dilate(binary, element2, iterations=1)
 
-    # 5. 腐蚀一次，去掉细节，如表格线等。注意这里去掉的是竖直的线
+    # 5. 腐蚀一次，去掉细节，如表格线等。注意这里去掉的是竖直的线, 该公式表示图像A用卷积模板B来进行腐蚀处理，通过模板B与图像A进行卷积计算，得出B覆盖区域的像素点最小值，并用这个最小值来替代参考点的像素值。如图所示，将左边的原始图像A腐蚀处理为右边的效果图A-B。
     erosion = cv2.erode(dilation, element1, iterations=1)
 
     # 6. 再次膨胀，让轮廓明显一些
@@ -62,7 +63,7 @@ def findTextRegion(img):
         area = cv2.contourArea(cnt)
 
         # 面积小的都筛选掉
-        if (area < 1500):
+        if (area < ocr_area):
             continue
 
         # 轮廓近似，作用很小
@@ -85,7 +86,6 @@ def findTextRegion(img):
         # 筛选那些太细的矩形，留下扁的
         if (height > width * 1.2 or height <= 15):
             continue
-
 
         region.append(box)
 
@@ -136,7 +136,6 @@ def detect(img,im,path):
     print(result)
     #cv2.namedWindow("img", cv2.WINDOW_NORMAL)
     #cv2.imshow("img", img)
-
 
     # 带轮廓的图片
     cv2.imwrite(path.replace("png","jpg",),img)
